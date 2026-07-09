@@ -59,6 +59,49 @@ windows:
     cmd: "   aws lambda invoke --region me-south-1 --function-name spectrum-migration-runner-spectrummigrationrunnerd-7tvuaaSpJ0HJ /dev/stdout | jq"
     norun: true
 
+  - title: SYNC
+    working_directory: ../../spectrum-backend/pgsync/
+    leftside:
+      upperside:
+        cmd: |
+          podman run -it --replace --rm \
+            -p 9200:9200 -p 9600:9600 \
+            -e OPENSEARCH_INITIAL_ADMIN_PASSWORD='zqPA+HyG0DbLc++UxCt8YNc9adM=' \
+            -e "discovery.type=single-node" \
+            -e "plugins.security.disabled=true" \
+            --name opensearch-node opensearchproject/opensearch:latest
+        # norun: true
+
+      lowerside:
+        cmd: |
+          podman run -it --replace --rm \
+            -p 127.0.0.1:5601:5601 \
+            -e 'OPENSEARCH_HOSTS=["http://host.containers.internal:9200"]' \
+            -e 'DISABLE_SECURITY_DASHBOARDS_PLUGIN=true' \
+            --name opensearch-dashboards docker.io/opensearchproject/opensearch-dashboards:latest
+
+    rightside:
+      cmd: |
+        export PG_URL=postgresql://postgres:@localhost/spectrumlocal
+        export PG_DRIVER=psycopg2
+        export ELASTICSEARCH_HOST=localhost
+        export ELASTICSEARCH_USER=admin
+        export ELASTICSEARCH_PASSWORD="P@ssw0rd__TTHrovnXAM9Zeu8XnWcoT+fqs4A="
+        export PG_DRIVER=psycopg2
+        export OPENSEARCH=true
+
+          CONSOLE_LOGGING_HANDLER_MIN_LEVEL=DEBUG PYTHONPATH=$PWD uvx pgsync --config schema.json --wal --verbose
+      norun: true
+
+  - title: GEN
+    working_directory: ../../s/
+    leftside:
+      cmd: "  time bun generate-mock.ts 100"
+      norun: true
+    rightside:
+      cmd: "  \\clear && curl localhost:9200/spectrumlocal/_doc/C0014007 | jq"
+      norun: true
+
   # - title: TREE
   #   leftside:
   #     cmd: "  nvim data-loader.py"
